@@ -20,6 +20,7 @@ Plug 'lfv89/vim-interestingwords'
 - Highlight with ``<Leader>k``
 - Navigate highlighted words with ``n`` and ``N``
 - Clear every word highlight with ``<Leader>K`` throughout the buffer
+- Change the upcoming highlight color with ``:InterestingWordsNextColor`` or ``:InterestingWordsRandomNextColor`` if you want a different shade before toggling
 
 ### Highlighting Words
 
@@ -32,6 +33,10 @@ With a highlighted word **under your cursor**, you can **navigate** through the 
 ### Clearing (every) Highlight
 
 Finally, if you don't want to toggle every single highlighted word and want to clear all of them, just hit ``<Leader>K``
+
+### Picking the Next Color
+
+If you'd prefer a different color for the next highlighted word, run ``:InterestingWordsNextColor`` before toggling the highlight. The command cycles to the next unused highlight group so the following word you add receives a new color without clearing existing highlights. Alternatively, ``:InterestingWordsRandomNextColor`` picks a random unused highlight group so you don't need to decide which color comes next.
 
 ## Configuration
 

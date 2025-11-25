@@ -15,14 +15,15 @@ let s:interestingWords = []
 let s:interestingModes = []
 let s:mids = {}
 let s:recentlyUsed = []
+let s:nextColorIndex = -1
 
 function! ColorWord(word, mode)
   if !(s:hasBuiltColors)
     call s:buildColors()
   endif
 
-  " gets the lowest unused index
-  let n = index(s:interestingWords, 0)
+  " select the index for the next highlight
+  let n = s:selectNextIndex()
   if (n == -1)
     if !(exists('g:interestingWordsCycleColors') && g:interestingWordsCycleColors)
       echom "InterestingWords: max number of highlight groups reached " . len(s:interestingWords)
@@ -42,6 +43,116 @@ function! ColorWord(word, mode)
 
   call s:markRecentlyUsed(n)
 
+endfunction
+
+function! s:selectNextIndex() abort
+  if s:nextColorIndex >= 0 && s:isIndexAvailable(s:nextColorIndex)
+    let idx = s:nextColorIndex
+    let s:nextColorIndex = -1
+    return idx
+  endif
+  let s:nextColorIndex = -1
+  return index(s:interestingWords, 0)
+endfunction
+
+function! s:isIndexAvailable(idx) abort
+  return a:idx >= 0 && a:idx < len(s:interestingWords) && s:interestingWords[a:idx] == 0
+endfunction
+
+function! s:availableIndexes() abort
+  let available = []
+  let idx = 0
+  for word in s:interestingWords
+    if word == 0
+      call add(available, idx)
+    endif
+    let idx += 1
+  endfor
+  return available
+endfunction
+
+function! InterestingWordsNextColor() abort
+  if !(s:hasBuiltColors)
+    call s:buildColors()
+  endif
+
+  let current = index(s:interestingWords, 0)
+  if current == -1
+    echohl WarningMsg | echomsg "InterestingWords: all highlight groups are currently in use."
+    return
+  endif
+
+  let next = s:nextUnusedIndexAfter(current)
+  if next == -1
+    echohl WarningMsg | echomsg "InterestingWords: no alternative unused highlight colors available."
+    return
+  endif
+
+  let s:nextColorIndex = next
+  call s:announceNextColor(next)
+endfunction
+
+function! InterestingWordsRandomNextColor() abort
+  if !(s:hasBuiltColors)
+    call s:buildColors()
+  endif
+
+  let available = s:availableIndexes()
+  if empty(available)
+    echohl WarningMsg | echomsg "InterestingWords: all highlight groups are currently in use."
+    return
+  endif
+
+  let current = index(s:interestingWords, 0)
+  if current == -1
+    echohl WarningMsg | echomsg "InterestingWords: all highlight groups are currently in use."
+    return
+  endif
+
+  let candidates = []
+  for idx in available
+    if idx != current
+      call add(candidates, idx)
+    endif
+  endfor
+
+  if empty(candidates)
+    echohl WarningMsg | echomsg "InterestingWords: no alternative unused highlight colors available."
+    return
+  endif
+
+  let pickIndex = len(candidates) == 1 ? 0 : s:Random(len(candidates))
+  if pickIndex >= len(candidates)
+    let pickIndex = len(candidates) - 1
+  endif
+  let pick = candidates[pickIndex]
+  let s:nextColorIndex = pick
+  call s:announceNextColor(pick)
+endfunction
+
+function! s:nextUnusedIndexAfter(idx) abort
+  let total = len(s:interestingWords)
+  if total <= 1
+    return -1
+  endif
+  let i = (a:idx + 1) % total
+  while i != a:idx
+    if s:isIndexAvailable(i)
+      return i
+    endif
+    let i = (i + 1) % total
+  endwhile
+  return -1
+endfunction
+
+function! s:announceNextColor(idx) abort
+  let ui = s:uiMode()
+  let palette = ui ==# 'gui' ? g:interestingWordsGUIColors : g:interestingWordsTermColors
+  if a:idx >= 0 && a:idx < len(palette)
+    echom printf('InterestingWords: next color set to %s (group %d).', palette[a:idx], a:idx + 1)
+  else
+    echom printf('InterestingWords: next highlight group set to %d.', a:idx + 1)
+  endif
 endfunction
 
 function! s:apply_color_to_word(n, word, mode, mid)
@@ -268,3 +379,6 @@ if g:interestingWordsDefaultMappings
    catch /E227/
    endtry
 endif
+
+command! -nargs=0 -bar InterestingWordsNextColor call InterestingWordsNextColor()
+command! -nargs=0 -bar InterestingWordsRandomNextColor call InterestingWordsRandomNextColor()
