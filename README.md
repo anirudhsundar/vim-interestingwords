@@ -21,10 +21,15 @@ Plug 'lfv89/vim-interestingwords'
 - Navigate highlighted words with ``n`` and ``N``
 - Clear every word highlight with ``<Leader>K`` throughout the buffer
 - Change the upcoming highlight color with ``:InterestingWordsNextColor`` or ``:InterestingWordsRandomNextColor`` if you want a different shade before toggling
+- Highlight arbitrary matches with ``:InterestingWordRegex {pattern}``
 
 ### Highlighting Words
 
 ``<Leader>k`` will act as a **toggle**, so you can use it to highlight and remove the highlight from a given word. Note that you can highlight different words at the same time.
+
+### Highlighting With a Regex
+
+Use ``:InterestingWordRegex {pattern}`` to toggle highlights for an arbitrary Vim regular expression. The pattern is passed straight to ``matchadd()``, so you can use the full syntax (for example ``:InterestingWordRegex \vfoo\s+bar``). Repeating the command with the same pattern removes the highlight.
 
 ### Navigating Highlights
 

@@ -156,11 +156,15 @@ function! s:announceNextColor(idx) abort
 endfunction
 
 function! s:apply_color_to_word(n, word, mode, mid)
-  let case = s:checkIgnoreCase(a:word) ? '\c' : '\C'
-  if a:mode == 'v'
-    let pat = case . '\V\zs' . escape(a:word, '\') . '\ze'
+  if a:mode ==# 'r'
+    let pat = a:word
   else
-    let pat = case . '\V\<' . escape(a:word, '\') . '\>'
+    let case = s:checkIgnoreCase(a:word) ? '\c' : '\C'
+    if a:mode ==# 'v'
+      let pat = case . '\V\zs' . escape(a:word, '\') . '\ze'
+    else
+      let pat = case . '\V\<' . escape(a:word, '\') . '\>'
+    endif
   endif
 
   try
@@ -177,9 +181,16 @@ function! s:nearest_group_at_cursor() abort
       continue
     endif
     let l:word = l:mids[0][0]
-    let l:position = match(getline('.'), l:match_item.pattern)
+    let l:line = getline('.')
+    let l:position = match(l:line, l:match_item.pattern)
     if l:position > -1
-      if col('.') > l:position && col('.') <= l:position + len(l:word)
+      let l:match_text = matchstr(l:line, l:match_item.pattern)
+      if l:match_text ==# ''
+        let l:end_col = l:position + 1
+      else
+        let l:end_col = l:position + strlen(l:match_text)
+      endif
+      if col('.') > l:position && col('.') <= l:end_col
         return l:word
       endif
     endif
@@ -203,21 +214,50 @@ function! s:getmatch(mid) abort
   return filter(getmatches(), 'v:val.id==a:mid')[0]
 endfunction
 
+function! s:perform_default_search(direction) abort
+  try
+    if a:direction
+      normal! n
+    else
+      normal! N
+    endif
+  catch /E486/
+    echohl WarningMsg | echomsg "E486: Pattern not found: " . @/
+  endtry
+endfunction
+
 function! WordNavigation(direction)
   let currentWord = s:nearest_group_at_cursor()
 
-  if (s:checkIgnoreCase(currentWord))
-    let currentWord = tolower(currentWord)
+  if empty(currentWord)
+    call s:perform_default_search(a:direction)
+    return
   endif
 
-  if (index(s:interestingWords, currentWord) > -1)
-    let l:index = index(s:interestingWords, currentWord)
-    let l:mode = s:interestingModes[index]
-    let case = s:checkIgnoreCase(currentWord) ? '\c' : '\C'
-    if l:mode == 'v'
-      let pat = case . '\V\zs' . escape(currentWord, '\') . '\ze'
+  let lookup = currentWord
+  let wordIndex = index(s:interestingWords, lookup)
+  if wordIndex == -1
+    let alt = tolower(currentWord)
+    if alt !=# currentWord
+      let wordIndex = index(s:interestingWords, alt)
+      if wordIndex > -1
+        let lookup = alt
+      endif
+    endif
+  endif
+
+  if wordIndex > -1
+    let mode = s:interestingModes[wordIndex]
+    let storedWord = s:interestingWords[wordIndex]
+    if mode ==# 'r'
+      let pat = storedWord
     else
-      let pat = case . '\V\<' . escape(currentWord, '\') . '\>'
+      let case = s:checkIgnoreCase(storedWord) ? '\c' : '\C'
+      if mode ==# 'v'
+        let pat = case . '\V\zs' . escape(storedWord, '\') . '\ze'
+      else
+        let pat = case . '\V\<' . escape(storedWord, '\') . '\>'
+      endif
     endif
     let searchFlag = ''
     if !(a:direction)
@@ -225,15 +265,7 @@ function! WordNavigation(direction)
     endif
     call search(pat, searchFlag)
   else
-    try
-      if (a:direction)
-        normal! n
-      else
-        normal! N
-      endif
-    catch /E486/
-      echohl WarningMsg | echomsg "E486: Pattern not found: " . @/
-    endtry
+    call s:perform_default_search(a:direction)
   endif
 endfunction
 
@@ -253,6 +285,22 @@ function! InterestingWords(mode) range
     call ColorWord(currentWord, a:mode)
   else
     call UncolorWord(currentWord)
+  endif
+endfunction
+
+function! InterestingWordRegex(pattern)
+  if a:pattern ==# ''
+    return
+  endif
+  if !(s:hasBuiltColors)
+    call s:buildColors()
+  endif
+
+  let key = a:pattern
+  if index(s:interestingWords, key) == -1
+    call ColorWord(key, 'r')
+  else
+    call UncolorWord(key)
   endif
 endfunction
 
@@ -382,3 +430,4 @@ endif
 
 command! -nargs=0 -bar InterestingWordsNextColor call InterestingWordsNextColor()
 command! -nargs=0 -bar InterestingWordsRandomNextColor call InterestingWordsRandomNextColor()
+command! -nargs=1 -bar InterestingWordRegex call InterestingWordRegex(<q-args>)
